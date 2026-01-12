@@ -1,0 +1,17 @@
+{
+  "name": "2026-01-09-new-ai-gateway-access-worker",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy --minify",
+    "cf-typegen": "wrangler types --env-interface CloudflareBindings"
+  },
+  "dependencies": {
+    "@hono/zod-validator": "^0.7.6",
+    "hono": "^4.11.3",
+    "openai": "^6.15.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.4.0"
+  }
+}

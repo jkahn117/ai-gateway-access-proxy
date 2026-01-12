@@ -1,0 +1,27 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "2026-01-09-new-ai-gateway-access-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-01-09",
+  "vars": {
+    "AI_GATEWAY_URL": "https://gateway.ai.cloudflare.com/v1/9b453c382b0dcb55a9f87834b13d2883/jkahn1/compat",
+    "AI_GATEWAY_ID": "jkahn1"
+  },
+  "kv_namespaces": [
+    {
+      "binding": "TEAM_INFO",
+      "id": "3d0eaa9fdcb74dd4b2a2239f202896e9"
+    }
+    // {
+    // 	"binding": "MODEL_MAPPINGS",
+    // 	"id": "c7dcf73c538d4e2d8cf9bb67e4ff686c"
+    // }
+  ],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "ai": {
+    "binding": "AI"
+  }
+}
