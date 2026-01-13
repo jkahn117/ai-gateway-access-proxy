@@ -6,7 +6,8 @@
   "vars": {
     "AI_GATEWAY_URL": "https://gateway.ai.cloudflare.com/v1/9b453c382b0dcb55a9f87834b13d2883/jkahn1",
     "AI_GATEWAY_ID": "jkahn1",
-    "AWS_REGION": "us-east-1"
+    "AWS_REGION": "us-east-1",
+    "AZURE_RESOURCE_NAME": "grycz-open-ai-east-us-2"
   },
   "kv_namespaces": [
     {

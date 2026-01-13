@@ -6,7 +6,7 @@ const client = new OpenAI({
 });
 
 const chat = await client.chat.completions.create({
-  model: "azure-openai/gpt-5",
+  model: "gpt-5.2-chat",
   messages: [{ role: "user", content: "What is Cloudflare?" }],
 });
 

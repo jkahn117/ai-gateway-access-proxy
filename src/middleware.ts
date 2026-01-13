@@ -14,10 +14,13 @@ type Env = {
     AWS_ACCESS_KEY_ID: string;
     AWS_SECRET_ACCESS_KEY: string;
     AWS_REGION: string;
+    // Azure
+    AZURE_RESOURCE_NAME: string;
   };
   Variables: {
     aiFetch: (url: string, init?: RequestInit) => Promise<Response>;
     team: TeamInfo;
+    model: string;
   };
 };
 
@@ -78,6 +81,23 @@ const aiFetch = createMiddleware<Env>(async (c, next) => {
   await next();
 });
 
+/**
+ *
+ */
+const captureModel = createMiddleware<Env>(async (c, next) => {
+  const cloned = c.req.raw.clone();
+
+  const body = await cloned.json();
+  const model = (body as any).model;
+
+  c.set("model", model);
+
+  await next();
+});
+
+/**
+ *
+ */
 const logger = createMiddleware<Env>(async (c, next) => {
   // cloning so we can read again later
   const cloned = c.req.raw.clone();
@@ -99,7 +119,7 @@ const logger = createMiddleware<Env>(async (c, next) => {
   await next();
 });
 
-export { apiKey, aiFetch, logger };
+export { apiKey, aiFetch, captureModel, logger };
 
 /**
  *
