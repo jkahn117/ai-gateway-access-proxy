@@ -4,8 +4,9 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-01-09",
   "vars": {
-    "AI_GATEWAY_URL": "https://gateway.ai.cloudflare.com/v1/9b453c382b0dcb55a9f87834b13d2883/jkahn1/compat",
-    "AI_GATEWAY_ID": "jkahn1"
+    "AI_GATEWAY_URL": "https://gateway.ai.cloudflare.com/v1/9b453c382b0dcb55a9f87834b13d2883/jkahn1",
+    "AI_GATEWAY_ID": "jkahn1",
+    "AWS_REGION": "us-east-1"
   },
   "kv_namespaces": [
     {

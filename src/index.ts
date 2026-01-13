@@ -1,11 +1,14 @@
-import { Hono, Context } from "hono";
+import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { except } from "hono/combine";
 import { apiKey, aiFetch, logger } from "./middleware";
 
 import { tokenRouter } from "./token.router";
+import { anthropicRouter } from "./providers/anthropic.router";
+import { azureRouter } from "./providers/azure.router";
+import { bedrockRouter } from "./providers/bedrock.router";
+import { googleRouter } from "./providers/google.router";
 import { openaiRouter } from "./providers/openai.router";
-import { anthropicRouter } from "./providers/anthropic";
 import { workersAiRouter } from "./providers/workers-ai.router";
 
 export interface TeamInfo {
@@ -27,8 +30,11 @@ app.use("*", except(["/tokens"]), aiFetch);
 app.route("/tokens", tokenRouter);
 
 // provider routes
-app.route("/openai", openaiRouter);
 app.route("/anthropic", anthropicRouter);
+app.route("/azure", azureRouter);
+app.route("/bedrock", bedrockRouter);
+app.route("/google", googleRouter);
+app.route("/openai", openaiRouter);
 app.route("/workers-ai", workersAiRouter);
 
 // global error handler

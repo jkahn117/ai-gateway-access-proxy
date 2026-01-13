@@ -1,10 +1,10 @@
 # AI Gateway Proxy
 
-A Cloudflare Worker that provides a unified API gateway for multiple AI providers. Teams can access OpenAI, Anthropic, and Cloudflare Workers AI through a single authentication mechanism, with all requests routed through Cloudflare's AI Gateway for logging, caching, and analytics.
+A Cloudflare Worker that provides a unified API gateway for multiple AI providers. Teams can access OpenAI, Anthropic, Google AI Studio, AWS Bedrock, Azure OpenAI, and Cloudflare Workers AI through a single authentication mechanism, with all requests routed through Cloudflare's AI Gateway for logging, caching, and analytics.
 
 ## Features
 
-- **Multi-provider support** - Access OpenAI, Anthropic, and Workers AI through a single gateway
+- **Multi-provider support** - Access OpenAI, Anthropic, Google, Bedrock, Azure, and Workers AI through a single gateway
 - **Team-based API keys** - Issue and manage API keys per team/organization
 - **Request proxying** - Automatic routing to the correct provider via Cloudflare AI Gateway
 - **Metadata tracking** - Team information attached to requests for analytics and attribution
@@ -29,6 +29,8 @@ Create a `.dev.vars` file with your secrets:
 
 ```bash
 AI_GATEWAY_TOKEN=your_gateway_token_here
+AWS_ACCESS_KEY_ID=your_aws_access_key
+AWS_SECRET_ACCESS_KEY=your_aws_secret_key
 ```
 
 Start the development server:
@@ -163,6 +165,66 @@ curl -X POST https://your-worker.dev/workers-ai/@cf/meta/llama-3.1-8b-instruct \
   }'
 ```
 
+### Google AI Studio
+
+Proxy requests to Google AI Studio (Gemini models).
+
+**Base path:** `/google`
+
+```bash
+curl -X POST https://your-worker.dev/google/v1/chat/completions \
+  -H "Authorization: Bearer sk_your_api_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gemini-2.0-flash",
+    "messages": [{"role": "user", "content": "Hello!"}]
+  }'
+```
+
+### Azure OpenAI
+
+Proxy requests to Azure OpenAI Service.
+
+**Base path:** `/azure`
+
+```bash
+curl -X POST https://your-worker.dev/azure/v1/chat/completions \
+  -H "Authorization: Bearer sk_your_api_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4o",
+    "messages": [{"role": "user", "content": "Hello!"}]
+  }'
+```
+
+### Amazon Bedrock
+
+Proxy requests to AWS Bedrock models using an OpenAI-compatible interface. The gateway translates requests to Bedrock's Converse API and handles AWS Signature V4 signing automatically.
+
+**Base path:** `/bedrock`
+
+**Supported endpoints:** `/v1/chat/completions` only
+
+```bash
+curl -X POST https://your-worker.dev/bedrock/v1/chat/completions \
+  -H "Authorization: Bearer sk_your_api_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "nova-pro",
+    "messages": [{"role": "user", "content": "Hello!"}]
+  }'
+```
+
+**Supported model aliases:**
+
+| Alias | Bedrock Model ID |
+|-------|------------------|
+| `nova-pro` | `amazon.nova-pro-v1:0` |
+| `nova-lite` | `amazon.nova-lite-v1:0` |
+| `nova-micro` | `amazon.nova-micro-v1:0` |
+
+You can also use full Bedrock model IDs directly (any ID containing a `.`).
+
 ## Adding New Providers
 
 <!-- TODO: Add documentation for implementing new providers -->
@@ -225,6 +287,63 @@ Then update your `wrangler.jsonc` with your gateway details:
 
 You can find your Account ID in the Cloudflare Dashboard URL or in the **Workers & Pages** overview page.
 
+## AWS Bedrock Setup
+
+To use the Bedrock provider, you need AWS credentials with Bedrock access.
+
+### 1. Create an IAM User for Bedrock
+
+1. Log in to the [AWS Console](https://console.aws.amazon.com)
+2. Navigate to **IAM** > **Users** > **Create user**
+3. Enter a username (e.g., `ai-gateway-bedrock`)
+4. Click **Next** and select **Attach policies directly**
+5. Search for and attach the `AmazonBedrockFullAccess` policy (or create a more restrictive custom policy)
+6. Click **Create user**
+
+### 2. Generate Access Keys
+
+1. Select the user you just created
+2. Go to the **Security credentials** tab
+3. Under **Access keys**, click **Create access key**
+4. Select **Application running outside AWS**
+5. Click **Create access key**
+6. Copy both the **Access key ID** and **Secret access key**
+
+### 3. Enable Bedrock Models
+
+Before using Bedrock models, you must request access:
+
+1. Navigate to **Amazon Bedrock** > **Model access** in the AWS Console
+2. Click **Manage model access**
+3. Select the models you want to use (e.g., Claude, Llama, Titan)
+4. Click **Save changes** and wait for access to be granted
+
+### 4. Configure the Worker
+
+**For local development**, add to `.dev.vars`:
+
+```bash
+AWS_ACCESS_KEY_ID=your_access_key_here
+AWS_SECRET_ACCESS_KEY=your_secret_key_here
+```
+
+**For production**, set the secrets via Wrangler:
+
+```bash
+npx wrangler secret put AWS_ACCESS_KEY_ID
+npx wrangler secret put AWS_SECRET_ACCESS_KEY
+```
+
+Optionally set a different region in `wrangler.jsonc`:
+
+```jsonc
+{
+  "vars": {
+    "AWS_REGION": "us-west-2"
+  }
+}
+```
+
 ## Configuration
 
 ### Environment Variables
@@ -234,6 +353,9 @@ You can find your Account ID in the Cloudflare Dashboard URL or in the **Workers
 | `AI_GATEWAY_URL` | Full URL to your Cloudflare AI Gateway |
 | `AI_GATEWAY_ID` | Your AI Gateway identifier |
 | `AI_GATEWAY_TOKEN` | Authentication token for AI Gateway (secret) |
+| `AWS_REGION` | AWS region for Bedrock (default: `us-east-1`) |
+| `AWS_ACCESS_KEY_ID` | AWS access key for Bedrock (secret) |
+| `AWS_SECRET_ACCESS_KEY` | AWS secret key for Bedrock (secret) |
 
 ### KV Namespaces
 
@@ -249,8 +371,11 @@ src/
 ├── middleware.ts         # Auth, logging, and fetch middleware
 ├── token.router.ts       # Token CRUD operations
 └── providers/
+    ├── anthropic.router.ts   # Anthropic proxy
+    ├── azure.router.ts       # Azure OpenAI proxy
+    ├── bedrock.router.ts     # AWS Bedrock proxy
+    ├── google.router.ts      # Google AI Studio proxy
     ├── openai.router.ts      # OpenAI proxy
-    ├── anthropic.ts          # Anthropic proxy
     └── workers-ai.router.ts  # Workers AI proxy
 ```
 
