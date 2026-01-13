@@ -10,16 +10,12 @@ openaiRouter.post("*", async (c: Context) => {
   const baseUrl = await gateway.getUrl(PROVIDER_NAME);
 
   const path = c.req.path.replace(`/${PROVIDER_NAME}`, "");
+  const requestBody = c.get("requestBody");
 
   const proxyResponse = await c.get("aiFetch")(`${baseUrl}/v1${path}`, {
     method: c.req.raw.method,
-    body: c.req.raw.body,
+    body: JSON.stringify(requestBody),
   });
-
-  console.log("Response status:", proxyResponse.status);
-  if (!proxyResponse.ok) {
-    console.log("Error: ", await proxyResponse.clone().text());
-  }
 
   return proxyResponse;
 });

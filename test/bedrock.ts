@@ -6,8 +6,7 @@ const client = new OpenAI({
 });
 
 const chat = await client.chat.completions.create({
-  // model: "nova-micro",
-  model: "llama-3.1-8b",
+  model: "nova-micro",
   messages: [{ role: "user", content: "What is Cloudflare?" }],
 });
 

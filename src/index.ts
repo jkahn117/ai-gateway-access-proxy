@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { except } from "hono/combine";
-import { apiKey, aiFetch, logger } from "./middleware";
+import { apiKey, aiFetch, resolveModel, logger } from "./middleware";
 
 import { tokenRouter } from "./token.router";
 import { anthropicRouter } from "./providers/anthropic.router";
@@ -16,6 +16,7 @@ export interface TeamInfo {
   teamId: string;
   name: string;
   createdAt: string;
+  limited?: boolean;
 }
 
 export type Bindings = {
@@ -24,9 +25,10 @@ export type Bindings = {
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
-app.use("*", except(["/tokens"]), apiKey);
-app.use("*", except(["/tokens"]), logger);
-app.use("*", except(["/tokens"]), aiFetch);
+app.use("*", except(["/tokens"], apiKey));
+app.use("*", except(["/tokens"], resolveModel));
+app.use("*", except(["/tokens"], logger));
+app.use("*", except(["/tokens"], aiFetch));
 app.route("/tokens", tokenRouter);
 
 // provider routes

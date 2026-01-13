@@ -83,13 +83,7 @@ function resolveModelId(model: string): string | null {
  * }
  * ```
  */
-function convertToConverseFormat(openaiRequest: {
-  messages: Array<{ role: string; content: string }>;
-  max_tokens?: number;
-  temperature?: number;
-  top_p?: number;
-  stop?: string[];
-}): {
+function convertToConverseFormat(openaiRequest: Record<string, unknown>): {
   messages: Array<{ role: string; content: Array<{ text: string }> }>;
   inferenceConfig?: {
     maxTokens?: number;
@@ -98,7 +92,11 @@ function convertToConverseFormat(openaiRequest: {
     stopSequences?: string[];
   };
 } {
-  const converseMessages = openaiRequest.messages.map((msg) => ({
+  const messages = openaiRequest.messages as Array<{
+    role: string;
+    content: string;
+  }>;
+  const converseMessages = messages.map((msg) => ({
     role: msg.role === "assistant" ? "assistant" : "user",
     content: [{ text: msg.content }],
   }));
@@ -111,16 +109,16 @@ function convertToConverseFormat(openaiRequest: {
   } = {};
 
   if (openaiRequest.max_tokens) {
-    inferenceConfig.maxTokens = openaiRequest.max_tokens;
+    inferenceConfig.maxTokens = openaiRequest.max_tokens as number;
   }
   if (openaiRequest.temperature !== undefined) {
-    inferenceConfig.temperature = openaiRequest.temperature;
+    inferenceConfig.temperature = openaiRequest.temperature as number;
   }
   if (openaiRequest.top_p !== undefined) {
-    inferenceConfig.topP = openaiRequest.top_p;
+    inferenceConfig.topP = openaiRequest.top_p as number;
   }
   if (openaiRequest.stop) {
-    inferenceConfig.stopSequences = openaiRequest.stop;
+    inferenceConfig.stopSequences = openaiRequest.stop as string[];
   }
 
   return {
@@ -200,18 +198,18 @@ export const bedrockRouter = new Hono<{ Bindings: BedrockBindings }>();
 bedrockRouter.post("/chat/completions", async (c: Context) => {
   const region = c.env.AWS_REGION || "us-east-1";
 
-  // Parse the OpenAI-format request
-  const openaiRequest = await c.req.json();
+  // Get request body and model from middleware
+  const requestBody = c.get("requestBody") as Record<string, unknown>;
+  const model = c.get("model") as string;
+  const originalModel = c.get("originalModel") as string;
 
   // Resolve the model name to a Bedrock model ID
-  const modelId = resolveModelId(openaiRequest.model);
+  const modelId = resolveModelId(model);
   if (!modelId) {
     return c.json(
       {
         error: {
-          message: `Unknown model: ${
-            openaiRequest.model
-          }. Use a Bedrock model ID or one of: ${Object.keys(
+          message: `Unknown model: ${model}. Use a Bedrock model ID or one of: ${Object.keys(
             MODEL_MAPPING
           ).join(", ")}`,
           type: "invalid_request_error",
@@ -222,7 +220,7 @@ bedrockRouter.post("/chat/completions", async (c: Context) => {
   }
 
   // Convert to Bedrock Converse API format
-  const converseBody = convertToConverseFormat(openaiRequest);
+  const converseBody = convertToConverseFormat(requestBody);
   const body = JSON.stringify(converseBody);
 
   // Create AWS client for request signing
@@ -282,11 +280,9 @@ bedrockRouter.post("/chat/completions", async (c: Context) => {
   }
 
   // Convert Bedrock response to OpenAI format
+  // Use originalModel so client sees what they requested
   const converseResponse = await response.json();
-  const openaiResponse = convertToOpenAIFormat(
-    converseResponse,
-    openaiRequest.model
-  );
+  const openaiResponse = convertToOpenAIFormat(converseResponse, originalModel);
 
   return c.json(openaiResponse);
 });
@@ -299,7 +295,7 @@ bedrockRouter.all("*", async (c: Context) => {
   return c.json(
     {
       error: {
-        message: `The endpoint ${c.req.path} is not supported for Bedrock. Only /v1/chat/completions is currently available.`,
+        message: `The endpoint ${c.req.path} is not supported for Bedrock. Only /chat/completions is currently available.`,
         type: "invalid_request_error",
       },
     },

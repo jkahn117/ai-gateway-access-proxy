@@ -10,11 +10,13 @@ googleRouter.post("*", async (c: Context) => {
   const baseUrl = await gateway.getUrl();
 
   const path = c.req.path.replace("/google", "");
+  const model = c.get("model");
+  const requestBody = c.get("requestBody");
 
-  const body = await c.req.json();
+  // Google AI Studio requires provider prefix in model name
   const modifiedBody = JSON.stringify({
-    ...body,
-    model: `${PROVIDER_NAME}/${body.model}`,
+    ...requestBody,
+    model: `${PROVIDER_NAME}/${model}`,
   });
 
   const proxyResponse = await c.get("aiFetch")(`${baseUrl}compat${path}`, {

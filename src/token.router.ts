@@ -12,6 +12,7 @@ type Bindings = {
 export interface CreateTokenRequest {
   teamId: string;
   name: string;
+  limited?: boolean;
 }
 
 // Generate a secure random API key
@@ -42,6 +43,7 @@ tokenRouter.post("/", async (c: Context) => {
     teamId: body.teamId,
     createdAt: new Date().toISOString(),
     name: body.name,
+    limited: body.limited || false,
   };
 
   await c.env.TEAM_INFO.put(apiKey, JSON.stringify(teamInfo));

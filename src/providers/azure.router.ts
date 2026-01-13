@@ -1,5 +1,4 @@
 import { Hono, Context } from "hono";
-import { captureModel } from "../middleware";
 
 const PROVIDER_NAME = "azure-openai";
 
@@ -10,7 +9,6 @@ type AzureBindings = {
 };
 
 export const azureRouter = new Hono<{ Bindings: AzureBindings }>();
-azureRouter.use("*", captureModel);
 
 azureRouter.post("*", async (c: Context) => {
   const gateway = c.env.AI.gateway(c.env.AI_GATEWAY_ID);
@@ -19,19 +17,15 @@ azureRouter.post("*", async (c: Context) => {
   const path = c.req.path.replace("/azure/", "");
 
   const model = c.get("model");
+  const requestBody = c.get("requestBody");
 
   const proxyResponse = await c.get("aiFetch")(
     `${baseUrl}/${c.env.AZURE_RESOURCE_NAME}/${model}/${path}?api-version=2024-12-01-preview`,
     {
       method: c.req.raw.method,
-      body: c.req.raw.body,
+      body: JSON.stringify(requestBody),
     }
   );
-
-  console.log("Response status:", proxyResponse.status);
-  if (!proxyResponse.ok) {
-    console.log("Error: ", await proxyResponse.clone().text());
-  }
 
   return proxyResponse;
 });

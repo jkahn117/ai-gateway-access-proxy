@@ -1,6 +1,8 @@
 # AI Gateway Proxy
 
-A Cloudflare Worker that provides a unified API gateway for multiple AI providers. Teams can access OpenAI, Anthropic, Google AI Studio, AWS Bedrock, Azure OpenAI, and Cloudflare Workers AI through a single authentication mechanism, with all requests routed through Cloudflare's AI Gateway for logging, caching, and analytics.
+> Note that this project is a sample and may not support all use cases.
+
+A Cloudflare Worker that provides a unified interface to Cloudflare AI Gateway. Supports calling models using OpenAI SDK and a managed API key vended by the Worker. All internals required to call providers (e.g., Anthropic, Cloudflare Workers AI, OpenAI) are handled internally and transparent to the end user. All requests are routed through Cloudflare's AI Gateway for logging, caching, and analytics.
 
 ## Features
 
@@ -28,9 +30,13 @@ npm install
 Create a `.dev.vars` file with your secrets:
 
 ```bash
+# for Amazon Bedrock
 AI_GATEWAY_TOKEN=your_gateway_token_here
 AWS_ACCESS_KEY_ID=your_aws_access_key
 AWS_SECRET_ACCESS_KEY=your_aws_secret_key
+
+# for Azure
+AZURE_RESOURCE_NAME=your_azure_resource_name
 ```
 
 Start the development server:
@@ -66,16 +72,18 @@ curl -X POST https://your-worker.dev/tokens \
   -H "Content-Type: application/json" \
   -d '{
     "teamId": "team_123",
-    "name": "Acme Corp"
+    "name": "Acme Corp",
+    "limited": false
   }'
 ```
 
 **Request Body:**
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `teamId` | string | Unique identifier for the team |
-| `name` | string | Display name for the team |
+| Field     | Type    | Description                    |
+| --------- | ------- | ------------------------------ |
+| `teamId`  | string  | Unique identifier for the team |
+| `name`    | string  | Display name for the team      |
+| `limited` | boolean | If the team has limited access |
 
 **Response:**
 
@@ -84,16 +92,9 @@ curl -X POST https://your-worker.dev/tokens \
   "apiKey": "sk_15f302b2d87552519b3bbfb69bf97d3958c1e762719ab3195624c068aaec98f7",
   "teamId": "team_123",
   "name": "Acme Corp",
+  "limited": false,
   "createdAt": "2025-01-09T12:00:00.000Z"
 }
-```
-
-#### Get Token Info
-
-Retrieve team information for an API key.
-
-```bash
-curl https://your-worker.dev/tokens/sk_your_api_key_here
 ```
 
 #### Refresh a Token
@@ -111,11 +112,23 @@ curl -X POST https://your-worker.dev/tokens/sk_your_api_key_here/refresh
   "apiKey": "sk_new_key_here",
   "teamId": "team_123",
   "name": "Acme Corp",
+  "limited": false,
   "createdAt": "2025-01-09T12:00:00.000Z"
 }
 ```
 
 ## Providers
+
+All providers use the OpenAI SDK format, making it easy to switch between providers by changing the `baseURL`.
+
+```javascript
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  baseURL: "https://your-worker.dev/<provider>",
+  apiKey: "sk_your_api_key_here",
+});
+```
 
 ### OpenAI
 
@@ -123,14 +136,18 @@ Proxy requests to OpenAI's API.
 
 **Base path:** `/openai`
 
-```bash
-curl -X POST https://your-worker.dev/openai/v1/chat/completions \
-  -H "Authorization: Bearer sk_your_api_key_here" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "gpt-4o",
-    "messages": [{"role": "user", "content": "Hello!"}]
-  }'
+```javascript
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  baseURL: "https://your-worker.dev/openai",
+  apiKey: "sk_your_api_key_here",
+});
+
+const response = await client.chat.completions.create({
+  model: "gpt-4o",
+  messages: [{ role: "user", content: "What is Cloudflare?" }],
+});
 ```
 
 ### Anthropic
@@ -139,15 +156,18 @@ Proxy requests to Anthropic's Claude API.
 
 **Base path:** `/anthropic`
 
-```bash
-curl -X POST https://your-worker.dev/anthropic/v1/messages \
-  -H "Authorization: Bearer sk_your_api_key_here" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "claude-sonnet-4-20250514",
-    "max_tokens": 1024,
-    "messages": [{"role": "user", "content": "Hello!"}]
-  }'
+```javascript
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  baseURL: "https://your-worker.dev/anthropic",
+  apiKey: "sk_your_api_key_here",
+});
+
+const response = await client.chat.completions.create({
+  model: "claude-sonnet-4-5",
+  messages: [{ role: "user", content: "What is Cloudflare?" }],
+});
 ```
 
 ### Workers AI
@@ -156,13 +176,18 @@ Proxy requests to Cloudflare's Workers AI models.
 
 **Base path:** `/workers-ai`
 
-```bash
-curl -X POST https://your-worker.dev/workers-ai/@cf/meta/llama-3.1-8b-instruct \
-  -H "Authorization: Bearer sk_your_api_key_here" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "messages": [{"role": "user", "content": "Hello!"}]
-  }'
+```javascript
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  baseURL: "https://your-worker.dev/workers-ai",
+  apiKey: "sk_your_api_key_here",
+});
+
+const response = await client.chat.completions.create({
+  model: "@cf/meta/llama-3-8b-instruct",
+  messages: [{ role: "user", content: "What is Cloudflare?" }],
+});
 ```
 
 ### Google AI Studio
@@ -171,14 +196,18 @@ Proxy requests to Google AI Studio (Gemini models).
 
 **Base path:** `/google`
 
-```bash
-curl -X POST https://your-worker.dev/google/v1/chat/completions \
-  -H "Authorization: Bearer sk_your_api_key_here" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "gemini-2.0-flash",
-    "messages": [{"role": "user", "content": "Hello!"}]
-  }'
+```javascript
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  baseURL: "https://your-worker.dev/google",
+  apiKey: "sk_your_api_key_here",
+});
+
+const response = await client.chat.completions.create({
+  model: "gemini-2.5-flash",
+  messages: [{ role: "user", content: "What is Cloudflare?" }],
+});
 ```
 
 ### Azure OpenAI
@@ -187,15 +216,27 @@ Proxy requests to Azure OpenAI Service.
 
 **Base path:** `/azure`
 
-```bash
-curl -X POST https://your-worker.dev/azure/v1/chat/completions \
-  -H "Authorization: Bearer sk_your_api_key_here" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "gpt-4o",
-    "messages": [{"role": "user", "content": "Hello!"}]
-  }'
+**Note:** Azure OpenAI requires you to deploy a model to a resource before use. The `model` field should match your deployment name.
+
+```javascript
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  baseURL: "https://your-worker.dev/azure",
+  apiKey: "sk_your_api_key_here",
+});
+
+const response = await client.chat.completions.create({
+  model: "my-gpt4o-deployment", // Use your deployment name
+  messages: [{ role: "user", content: "What is Cloudflare?" }],
+});
 ```
+
+To set up Azure OpenAI:
+
+1. Create an Azure OpenAI resource in the [Azure Portal](https://portal.azure.com)
+2. Deploy a model (e.g., `gpt-4o`) and note the **deployment name**
+3. Use the deployment name as the `model` in your requests
 
 ### Amazon Bedrock
 
@@ -205,29 +246,29 @@ Proxy requests to AWS Bedrock models using an OpenAI-compatible interface. The g
 
 **Supported endpoints:** `/v1/chat/completions` only
 
-```bash
-curl -X POST https://your-worker.dev/bedrock/v1/chat/completions \
-  -H "Authorization: Bearer sk_your_api_key_here" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "nova-pro",
-    "messages": [{"role": "user", "content": "Hello!"}]
-  }'
+```javascript
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  baseURL: "https://your-worker.dev/bedrock",
+  apiKey: "sk_your_api_key_here",
+});
+
+const response = await client.chat.completions.create({
+  model: "nova-micro",
+  messages: [{ role: "user", content: "What is Cloudflare?" }],
+});
 ```
 
 **Supported model aliases:**
 
-| Alias | Bedrock Model ID |
-|-------|------------------|
-| `nova-pro` | `amazon.nova-pro-v1:0` |
-| `nova-lite` | `amazon.nova-lite-v1:0` |
+| Alias        | Bedrock Model ID         |
+| ------------ | ------------------------ |
+| `nova-pro`   | `amazon.nova-pro-v1:0`   |
+| `nova-lite`  | `amazon.nova-lite-v1:0`  |
 | `nova-micro` | `amazon.nova-micro-v1:0` |
 
 You can also use full Bedrock model IDs directly (any ID containing a `.`).
-
-## Adding New Providers
-
-<!-- TODO: Add documentation for implementing new providers -->
 
 ## Cloudflare AI Gateway Setup
 
@@ -309,15 +350,6 @@ To use the Bedrock provider, you need AWS credentials with Bedrock access.
 5. Click **Create access key**
 6. Copy both the **Access key ID** and **Secret access key**
 
-### 3. Enable Bedrock Models
-
-Before using Bedrock models, you must request access:
-
-1. Navigate to **Amazon Bedrock** > **Model access** in the AWS Console
-2. Click **Manage model access**
-3. Select the models you want to use (e.g., Claude, Llama, Titan)
-4. Click **Save changes** and wait for access to be granted
-
 ### 4. Configure the Worker
 
 **For local development**, add to `.dev.vars`:
@@ -348,19 +380,20 @@ Optionally set a different region in `wrangler.jsonc`:
 
 ### Environment Variables
 
-| Variable | Description |
-|----------|-------------|
-| `AI_GATEWAY_URL` | Full URL to your Cloudflare AI Gateway |
-| `AI_GATEWAY_ID` | Your AI Gateway identifier |
-| `AI_GATEWAY_TOKEN` | Authentication token for AI Gateway (secret) |
-| `AWS_REGION` | AWS region for Bedrock (default: `us-east-1`) |
-| `AWS_ACCESS_KEY_ID` | AWS access key for Bedrock (secret) |
-| `AWS_SECRET_ACCESS_KEY` | AWS secret key for Bedrock (secret) |
+| Variable                | Description                                   |
+| ----------------------- | --------------------------------------------- |
+| `AI_GATEWAY_URL`        | Full URL to your Cloudflare AI Gateway        |
+| `AI_GATEWAY_ID`         | Your AI Gateway identifier                    |
+| `AI_GATEWAY_TOKEN`      | Authentication token for AI Gateway (secret)  |
+| `AWS_REGION`            | AWS region for Bedrock (default: `us-east-1`) |
+| `AWS_ACCESS_KEY_ID`     | AWS access key for Bedrock (secret)           |
+| `AWS_SECRET_ACCESS_KEY` | AWS secret key for Bedrock (secret)           |
+| `AZURE_RESOURCE_NAME`   | Azure deployed resource name                  |
 
 ### KV Namespaces
 
-| Namespace | Description |
-|-----------|-------------|
+| Namespace   | Description                          |
+| ----------- | ------------------------------------ |
 | `TEAM_INFO` | Stores API key to team info mappings |
 
 ## Project Structure
@@ -377,8 +410,15 @@ src/
     ├── google.router.ts      # Google AI Studio proxy
     ├── openai.router.ts      # OpenAI proxy
     └── workers-ai.router.ts  # Workers AI proxy
+└── test/
+    ├── anthropic.ts   # Anthropic sample
+    ├── azure.ts       # Azure OpenAI sample
+    ├── bedrock.ts     # AWS Bedrock sample
+    ├── google.ts      # Google AI Studio sample
+    ├── openai.ts      # OpenAI sample
+    └── workers-ai.ts  # Workers AI sample
 ```
 
 ## License
 
-MIT
+N/A
